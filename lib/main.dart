@@ -1,3 +1,4 @@
+import 'package:expense_tracker_app/firebase_options.dart';
 import 'package:expense_tracker_app/providers/transaction_provider.dart';
 import 'package:expense_tracker_app/providers/user_provider.dart';
 import 'package:expense_tracker_app/screens/add_edit_transaction_screen.dart';
@@ -6,10 +7,13 @@ import 'package:expense_tracker_app/screens/login_screen.dart';
 import 'package:expense_tracker_app/screens/statistics_screen.dart';
 import 'package:expense_tracker_app/screens/transaction_detail_screen.dart';
 import 'package:expense_tracker_app/utils/app_routes.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const ExpenseTrackerApp());
 }
 
