@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:expense_tracker_app/models/transaction_model.dart';
+import 'package:expense_tracker_app/services/firebase_transaction_service.dart';
 import 'package:expense_tracker_app/services/local_service.dart';
 import 'package:flutter/material.dart';
 
@@ -11,18 +12,22 @@ enum TransactionTimeFilter { all, today, thisWeek, thisMonth, thisYear, custom }
 class TransactionProvider extends ChangeNotifier {
   TransactionProvider({
     LocalService? localService,
+    FirebaseTransactionService? firebaseTransactionService,
     Duration? searchDebounceDuration,
     DateTime Function()? nowProvider,
   }) : _localService = localService ?? LocalService(),
+       _firebaseTransactionService = firebaseTransactionService,
        _searchDebounceDuration =
            searchDebounceDuration ?? const Duration(milliseconds: 350),
        _nowProvider = nowProvider ?? DateTime.now;
 
   final LocalService _localService;
+  final FirebaseTransactionService? _firebaseTransactionService;
   final Duration _searchDebounceDuration;
   final DateTime Function() _nowProvider;
 
   final List<TransactionModel> _transactions = [];
+  final List<TransactionModel> _filteredTransactions = [];
   String? _activeUserId;
   bool _isLoading = false;
   String? _error;
@@ -86,20 +91,45 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   Future<void> loadTransactions() async {
-    if (_activeUserId == null) {
-      _transactions.clear();
-      _isLoading = false;
-      _error = null;
-      notifyListeners();
-      return;
-    }
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final data = await _localService.getTransactionsByUser(_activeUserId!);
+      List<TransactionModel> data;
+
+      if (_activeUserId == null) {
+        data = await _localService.getTransactions();
+      } else {
+        final userId = _activeUserId!;
+        final localData = await _localService.getTransactionsByUser(userId);
+        if (_firebaseTransactionService == null) {
+          data = localData;
+        } else {
+          try {
+            final remoteData = await _firebaseTransactionService!
+                .getTransactionsByUser(userId);
+          if (remoteData.isNotEmpty || localData.isEmpty) {
+            data = remoteData;
+            await _localService.saveTransactionsByUser(
+              userId: userId,
+              transactions: remoteData,
+            );
+          } else {
+            data = localData;
+            unawaited(
+              _firebaseTransactionService!.saveTransactionsByUser(
+                userId: userId,
+                transactions: localData,
+              ),
+            );
+          }
+          } catch (_) {
+            data = localData;
+          }
+        }
+      }
+
       _transactions
         ..clear()
         ..addAll(data);
@@ -154,27 +184,126 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    if (_activeUserId == null) {
-      _error = 'Cannot save transactions: user not found';
-      notifyListeners();
-      return;
-    }
-
-    _error = null;
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> _persist() async {
     try {
-      await _localService.saveTransactionsByUser(
-        userId: _activeUserId!,
-        transactions: _transactions,
-      );
+      if (_activeUserId == null) {
+        await _localService.saveTransactions(_transactions);
+      } else {
+        final userId = _activeUserId!;
+        await _localService.saveTransactionsByUser(
+          userId: userId,
+          transactions: _transactions,
+        );
+        if (_firebaseTransactionService != null) {
+          await _firebaseTransactionService!.saveTransactionsByUser(
+            userId: userId,
+            transactions: _transactions,
+          );
+        }
+      }
     } catch (e) {
       _error = 'Cannot save transactions: $e';
       notifyListeners();
     }
+  }
+
+  void onSearchQueryChanged(String query) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(_searchDebounceDuration, () {
+      _searchQuery = query.trim();
+      _applyFilterAndSearch();
+    });
+  }
+
+  void onSearchChanged(String query) {
+    onSearchQueryChanged(query);
+  }
+
+  void setSearchQuery(String query) {
+    _searchDebounceTimer?.cancel();
+    _searchQuery = query.trim();
+    _applyFilterAndSearch();
+  }
+
+  void setTypeFilter(TransactionTypeFilter type) {
+    if (_typeFilter == type) {
+      return;
+    }
+
+    _typeFilter = type;
+    _applyFilterAndSearch();
+  }
+
+  void setTimeFilter(TransactionTimeFilter filter) {
+    if (_timeFilter == filter) {
+      return;
+    }
+
+    _timeFilter = filter;
+    if (filter != TransactionTimeFilter.custom) {
+      _customDateRange = null;
+    }
+    _applyFilterAndSearch();
+  }
+
+  void setCustomDateRange(DateTimeRange? range) {
+    if (range == null) {
+      _customDateRange = null;
+      _timeFilter = TransactionTimeFilter.all;
+      _applyFilterAndSearch();
+      return;
+    }
+
+    _customDateRange = _normalizeDateRange(range);
+    _timeFilter = TransactionTimeFilter.custom;
+    _applyFilterAndSearch();
+  }
+
+  void clearFilters() {
+    _searchDebounceTimer?.cancel();
+    _searchQuery = '';
+    _typeFilter = TransactionTypeFilter.all;
+    _timeFilter = TransactionTimeFilter.all;
+    _customDateRange = null;
+    _applyFilterAndSearch();
+  }
+
+  Map<String, double> get expenseByCategory {
+    final result = <String, double>{};
+    for (final tx in _filteredTransactions) {
+      if (tx.type != TransactionType.expense) {
+        continue;
+      }
+
+      result.update(tx.category, (value) => value + tx.amount, ifAbsent: () => tx.amount);
+    }
+
+    return result;
+  }
+
+  Map<String, double> get allExpenseByCategory {
+    final result = <String, double>{};
+    for (final tx in _transactions) {
+      if (tx.type != TransactionType.expense) {
+        continue;
+      }
+
+      result.update(tx.category, (value) => value + tx.amount, ifAbsent: () => tx.amount);
+    }
+
+    return result;
+  }
+
+  Map<String, double> get allIncomeByCategory {
+    final result = <String, double>{};
+    for (final tx in _transactions) {
+      if (tx.type != TransactionType.income) {
+        continue;
+      }
+
+      result.update(tx.category, (value) => value + tx.amount, ifAbsent: () => tx.amount);
+    }
+
+    return result;
   }
 
   void _applyFilterAndSearch({bool shouldNotify = true}) {

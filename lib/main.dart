@@ -6,6 +6,7 @@ import 'package:expense_tracker_app/screens/home_screen.dart';
 import 'package:expense_tracker_app/screens/login_screen.dart';
 import 'package:expense_tracker_app/screens/statistics_screen.dart';
 import 'package:expense_tracker_app/screens/transaction_detail_screen.dart';
+import 'package:expense_tracker_app/services/firebase_transaction_service.dart';
 import 'package:expense_tracker_app/utils/app_routes.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -26,9 +27,15 @@ class ExpenseTrackerApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()..initialize()),
         ChangeNotifierProxyProvider<UserProvider, TransactionProvider>(
-          create: (_) => TransactionProvider(),
+          create: (_) => TransactionProvider(
+            firebaseTransactionService: FirebaseTransactionService(),
+          ),
           update: (_, userProvider, transactionProvider) {
-            final provider = transactionProvider ?? TransactionProvider();
+            final provider =
+                transactionProvider ??
+                TransactionProvider(
+                  firebaseTransactionService: FirebaseTransactionService(),
+                );
             provider.bindUser(userProvider.currentUser?.id);
             return provider;
           },

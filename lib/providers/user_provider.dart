@@ -35,7 +35,13 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _currentUser = await _localService.getUser();
+      final authUser = _authService.getCurrentUser();
+      if (authUser != null) {
+        _currentUser = authUser;
+        await _localService.saveUser(authUser);
+      } else {
+        _currentUser = await _localService.getUser();
+      }
     } catch (e) {
       _error = 'Cannot load user: $e';
     } finally {
@@ -61,6 +67,68 @@ class UserProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Google Sign-In thất bại: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final user = await _authService.signInWithEmailPassword(
+        email: email,
+        password: password,
+      );
+      if (user == null) {
+        _error = 'Đăng nhập thất bại.';
+        return false;
+      }
+
+      _currentUser = user;
+      await _localService.saveUser(user);
+      return true;
+    } catch (e) {
+      _error = 'Đăng nhập Email thất bại: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> registerWithEmailPassword({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final user = await _authService.registerWithEmailPassword(
+        email: email,
+        password: password,
+        displayName: name,
+      );
+      if (user == null) {
+        _error = 'Đăng ký thất bại.';
+        return false;
+      }
+
+      _currentUser = user;
+      await _localService.saveUser(user);
+      return true;
+    } catch (e) {
+      _error = 'Đăng ký Email thất bại: $e';
       return false;
     } finally {
       _isLoading = false;
