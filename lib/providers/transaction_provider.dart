@@ -23,7 +23,7 @@ class TransactionProvider extends ChangeNotifier {
   final DateTime Function() _nowProvider;
 
   final List<TransactionModel> _transactions = [];
-  final List<TransactionModel> _filteredTransactions = [];
+  String? _activeUserId;
   bool _isLoading = false;
   String? _error;
 
@@ -67,13 +67,39 @@ class TransactionProvider extends ChangeNotifier {
   double get balance => totalIncome - totalExpense;
   double get filteredBalance => filteredIncome - filteredExpense;
 
+  void bindUser(String? userId) {
+    if (_activeUserId == userId) {
+      return;
+    }
+
+    _activeUserId = userId;
+    _error = null;
+
+    if (userId == null) {
+      _isLoading = false;
+      _transactions.clear();
+      notifyListeners();
+      return;
+    }
+
+    unawaited(loadTransactions());
+  }
+
   Future<void> loadTransactions() async {
+    if (_activeUserId == null) {
+      _transactions.clear();
+      _isLoading = false;
+      _error = null;
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final data = await _localService.getTransactions();
+      final data = await _localService.getTransactionsByUser(_activeUserId!);
       _transactions
         ..clear()
         ..addAll(data);
@@ -127,102 +153,13 @@ class TransactionProvider extends ChangeNotifier {
     await _persist();
   }
 
-  void onSearchChanged(String query) {
-    _searchDebounceTimer?.cancel();
-    _searchDebounceTimer = Timer(_searchDebounceDuration, () {
-      setSearchQuery(query);
-    });
-  }
-
-  void setSearchQuery(String query) {
-    final normalized = query.trim();
-    if (_searchQuery == normalized) {
+  Future<void> _persist() async {
+    if (_activeUserId == null) {
+      _error = 'Cannot save transactions: user not found';
+      notifyListeners();
       return;
     }
 
-    _searchQuery = normalized;
-    _applyFilterAndSearch();
-  }
-
-  void clearSearch() {
-    setSearchQuery('');
-  }
-
-  void setTypeFilter(TransactionTypeFilter filter) {
-    if (_typeFilter == filter) {
-      return;
-    }
-
-    _typeFilter = filter;
-    _applyFilterAndSearch();
-  }
-
-  void setTimeFilter(TransactionTimeFilter filter) {
-    if (_timeFilter == filter && filter != TransactionTimeFilter.custom) {
-      return;
-    }
-
-    _timeFilter = filter;
-    if (filter != TransactionTimeFilter.custom) {
-      _customDateRange = null;
-    }
-
-    _applyFilterAndSearch();
-  }
-
-  void setCustomDateRange(DateTimeRange? range) {
-    if (range == null) {
-      final hadCustomRange =
-          _customDateRange != null || _timeFilter != TransactionTimeFilter.all;
-      _customDateRange = null;
-      _timeFilter = TransactionTimeFilter.all;
-      if (hadCustomRange) {
-        _applyFilterAndSearch();
-      }
-      return;
-    }
-
-    final normalizedRange = _normalizeDateRange(range);
-    final hasSameRange =
-        _customDateRange != null &&
-        _isSameDate(_customDateRange!.start, normalizedRange.start) &&
-        _isSameDate(_customDateRange!.end, normalizedRange.end) &&
-        _timeFilter == TransactionTimeFilter.custom;
-
-    if (hasSameRange) {
-      return;
-    }
-
-    _customDateRange = normalizedRange;
-    _timeFilter = TransactionTimeFilter.custom;
-    _applyFilterAndSearch();
-  }
-
-  void clearFilters() {
-    final hasStateToClear =
-        _searchQuery.isNotEmpty ||
-        _typeFilter != TransactionTypeFilter.all ||
-        _timeFilter != TransactionTimeFilter.all;
-
-    _searchDebounceTimer?.cancel();
-    _searchQuery = '';
-    _typeFilter = TransactionTypeFilter.all;
-    _timeFilter = TransactionTimeFilter.all;
-    _customDateRange = null;
-
-    if (hasStateToClear) {
-      _applyFilterAndSearch();
-    }
-  }
-
-  void clearInMemoryData() {
-    _searchDebounceTimer?.cancel();
-    _transactions.clear();
-    _filteredTransactions.clear();
-    _searchQuery = '';
-    _typeFilter = TransactionTypeFilter.all;
-    _timeFilter = TransactionTimeFilter.all;
-    _customDateRange = null;
     _error = null;
     _isLoading = false;
     notifyListeners();
@@ -230,11 +167,10 @@ class TransactionProvider extends ChangeNotifier {
 
   Future<void> _persist() async {
     try {
-      await _localService.saveTransactions(_transactions);
-      if (_error != null) {
-        _error = null;
-        notifyListeners();
-      }
+      await _localService.saveTransactionsByUser(
+        userId: _activeUserId!,
+        transactions: _transactions,
+      );
     } catch (e) {
       _error = 'Cannot save transactions: $e';
       notifyListeners();
