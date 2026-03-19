@@ -1,6 +1,8 @@
 import 'package:expense_tracker_app/models/transaction_model.dart';
 import 'package:expense_tracker_app/providers/transaction_provider.dart';
+import 'package:expense_tracker_app/utils/constants.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 class AddEditTransactionScreen extends StatefulWidget {
@@ -14,12 +16,12 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
-  final _categoryController = TextEditingController();
   final _noteController = TextEditingController();
 
   TransactionModel? _editingTransaction;
   DateTime _selectedDate = DateTime.now();
   TransactionType _selectedType = TransactionType.expense;
+  String _selectedCategory = AppConstants.categories.first;
 
   @override
   void didChangeDependencies() {
@@ -33,7 +35,7 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       _editingTransaction = args;
       _titleController.text = args.title;
       _amountController.text = args.amount.toString();
-      _categoryController.text = args.category;
+      _selectedCategory = args.category;
       _noteController.text = args.note ?? '';
       _selectedDate = args.date;
       _selectedType = args.type;
@@ -44,7 +46,6 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
-    _categoryController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -69,13 +70,14 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
       return;
     }
 
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final amount =
+        double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0;
     final model = TransactionModel(
       id: _editingTransaction?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       amount: amount,
       date: _selectedDate,
-      category: _categoryController.text.trim(),
+      category: _selectedCategory,
       type: _selectedType,
       note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
     );
@@ -135,8 +137,16 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'Số tiền'),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
                 validator: (value) {
-                  final amount = double.tryParse(value ?? '');
+                  final raw = (value ?? '').trim().replaceAll(',', '.');
+                  final validPattern = RegExp(r'^\d+(\.\d{1,2})?$');
+                  if (!validPattern.hasMatch(raw)) {
+                    return 'Chỉ nhập số, tối đa 2 số thập phân';
+                  }
+                  final amount = double.tryParse(raw);
                   if (amount == null || amount <= 0) {
                     return 'Số tiền phải lớn hơn 0';
                   }
@@ -144,10 +154,32 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _categoryController,
+              DropdownButtonFormField<String>(
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(labelText: 'Danh mục'),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Vui lòng nhập danh mục' : null,
+                items: AppConstants.categories
+                    .map(
+                      (category) => DropdownMenuItem<String>(
+                        value: category,
+                        child: Row(
+                          children: [
+                            Icon(AppConstants.iconForCategory(category), size: 18),
+                            const SizedBox(width: 8),
+                            Text(category),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _selectedCategory = value;
+                  });
+                },
+                validator: (value) => value == null || value.isEmpty ? 'Vui lòng chọn danh mục' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
