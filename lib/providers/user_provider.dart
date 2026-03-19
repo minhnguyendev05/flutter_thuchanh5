@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 
 class UserProvider extends ChangeNotifier {
   UserProvider({AuthService? authService, LocalService? localService})
-      : _authService = authService ?? AuthService(),
-        _localService = localService ?? LocalService();
+    : _authService = authService ?? AuthService(),
+      _localService = localService ?? LocalService();
 
   final AuthService _authService;
   final LocalService _localService;
@@ -16,8 +16,18 @@ class UserProvider extends ChangeNotifier {
   String? _error;
 
   UserModel? get currentUser => _currentUser;
+  bool get isAuthenticated => _currentUser != null;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  void clearError() {
+    if (_error == null) {
+      return;
+    }
+
+    _error = null;
+    notifyListeners();
+  }
 
   Future<void> initialize() async {
     _isLoading = true;
