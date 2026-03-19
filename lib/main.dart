@@ -21,8 +21,13 @@ class ExpenseTrackerApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()..initialize()),
-        ChangeNotifierProvider<TransactionProvider>(
-          create: (_) => TransactionProvider()..loadTransactions(),
+        ChangeNotifierProxyProvider<UserProvider, TransactionProvider>(
+          create: (_) => TransactionProvider(),
+          update: (_, userProvider, transactionProvider) {
+            final provider = transactionProvider ?? TransactionProvider();
+            provider.bindUser(userProvider.currentUser?.id);
+            return provider;
+          },
         ),
       ],
       child: MaterialApp(
