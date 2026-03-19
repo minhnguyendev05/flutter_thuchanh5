@@ -4,6 +4,7 @@ import 'package:expense_tracker_app/screens/add_edit_transaction_screen.dart';
 import 'package:expense_tracker_app/screens/home_screen.dart';
 import 'package:expense_tracker_app/screens/login_screen.dart';
 import 'package:expense_tracker_app/screens/statistics_screen.dart';
+import 'package:expense_tracker_app/screens/transaction_detail_screen.dart';
 import 'package:expense_tracker_app/utils/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -45,6 +46,7 @@ class ExpenseTrackerApp extends StatelessWidget {
           AppRoutes.login: (_) => const LoginScreen(),
           AppRoutes.home: (_) => const HomeScreen(),
           AppRoutes.transactionForm: (_) => const AddEditTransactionScreen(),
+          AppRoutes.transactionDetail: (_) => const TransactionDetailScreen(),
           AppRoutes.statistics: (_) => const StatisticsScreen(),
         },
       ),
