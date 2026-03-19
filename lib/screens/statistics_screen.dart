@@ -1,3 +1,4 @@
+import 'package:expense_tracker_app/models/transaction_model.dart';
 import 'package:expense_tracker_app/providers/transaction_provider.dart';
 import 'package:expense_tracker_app/utils/app_formatters.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -15,47 +16,124 @@ class StatisticsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Consumer<TransactionProvider>(
           builder: (context, provider, _) {
-            final income = provider.totalIncome;
-            final expense = provider.totalExpense;
-            final total = income + expense;
+            if (provider.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-            if (total <= 0) {
-              return const Center(child: Text('Chưa có dữ liệu để thống kê.'));
+            if (provider.error != null) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 56,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        provider.error!,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => context.read<TransactionProvider>().loadTransactions(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final expenseByCategory = <String, double>{};
+            for (final tx in provider.transactions) {
+              if (tx.type == TransactionType.expense) {
+                expenseByCategory.update(
+                  tx.category,
+                  (value) => value + tx.amount,
+                  ifAbsent: () => tx.amount,
+                );
+              }
+            }
+
+            final totalExpense = expenseByCategory.values.fold<double>(0, (sum, amount) => sum + amount);
+
+            if (totalExpense <= 0) {
+              return const Center(child: Text('Chưa có dữ liệu chi tiêu để thống kê.'));
+            }
+
+            final colors = <Color>[
+              Colors.red,
+              Colors.orange,
+              Colors.amber,
+              Colors.pink,
+              Colors.indigo,
+              Colors.cyan,
+              Colors.teal,
+              Colors.blue,
+            ];
+
+            final entries = expenseByCategory.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value));
+
+            final sections = <PieChartSectionData>[];
+            for (var i = 0; i < entries.length; i++) {
+              final entry = entries[i];
+              final percent = (entry.value / totalExpense) * 100;
+              sections.add(
+                PieChartSectionData(
+                  value: entry.value,
+                  title: '${percent.toStringAsFixed(0)}%',
+                  color: colors[i % colors.length],
+                  radius: 82,
+                  titleStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              );
             }
 
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Tỷ lệ chi theo danh mục',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   height: 220,
                   child: PieChart(
                     PieChartData(
                       sectionsSpace: 2,
                       centerSpaceRadius: 40,
-                      sections: [
-                        PieChartSectionData(
-                          value: income,
-                          title: 'Thu',
-                          color: Colors.green,
-                        ),
-                        PieChartSectionData(
-                          value: expense,
-                          title: 'Chi',
-                          color: Colors.red,
-                        ),
-                      ],
+                      sections: sections,
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.green),
-                  title: const Text('Tổng thu'),
-                  trailing: Text(AppFormatters.currency(income)),
-                ),
-                ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.red),
-                  title: const Text('Tổng chi'),
-                  trailing: Text(AppFormatters.currency(expense)),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: entries.length,
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      final color = colors[index % colors.length];
+                      final percent = (entry.value / totalExpense) * 100;
+
+                      return ListTile(
+                        leading: CircleAvatar(backgroundColor: color),
+                        title: Text(entry.key),
+                        subtitle: Text('${percent.toStringAsFixed(1)}%'),
+                        trailing: Text(AppFormatters.currency(entry.value)),
+                      );
+                    },
+                  ),
                 ),
               ],
             );

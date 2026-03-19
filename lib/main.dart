@@ -31,6 +31,14 @@ class ExpenseTrackerApp extends StatelessWidget {
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         ),
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.teal,
+            brightness: Brightness.dark,
+          ),
+        ),
+        themeMode: ThemeMode.system,
         initialRoute: AppRoutes.root,
         routes: {
           AppRoutes.root: (_) => const RootRouter(),
@@ -53,6 +61,37 @@ class RootRouter extends StatelessWidget {
       builder: (context, userProvider, _) {
         if (userProvider.isLoading) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        if (userProvider.error != null && userProvider.currentUser == null) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 56,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      userProvider.error!,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => context.read<UserProvider>().initialize(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         if (userProvider.currentUser == null) {

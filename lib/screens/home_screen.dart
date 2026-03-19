@@ -9,6 +9,81 @@ import 'package:provider/provider.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  String _transactionSnapshot(TransactionProvider provider) {
+    return provider.transactions
+        .map(
+          (tx) =>
+              '${tx.id}|${tx.title}|${tx.amount}|${tx.category}|${tx.type.name}|${tx.date.toIso8601String()}|${tx.note ?? ''}',
+        )
+        .join('||');
+  }
+
+  Future<void> _openTransactionForm(
+    BuildContext context, {
+    Object? arguments,
+    required String successMessage,
+  }) async {
+    final providerBefore = context.read<TransactionProvider>();
+    final beforeSnapshot = _transactionSnapshot(providerBefore);
+
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.transactionForm,
+      arguments: arguments,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final providerAfter = context.read<TransactionProvider>();
+    final afterSnapshot = _transactionSnapshot(providerAfter);
+    if (beforeSnapshot == afterSnapshot) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(successMessage)));
+  }
+
+  Future<void> _confirmDelete(BuildContext context, String transactionId) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          icon: const Icon(Icons.delete_outline),
+          title: const Text('Xác nhận xóa'),
+          content: const Text('Bạn có chắc chắn muốn xóa?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Xóa'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !context.mounted) {
+      return;
+    }
+
+    await context.read<TransactionProvider>().deleteTransaction(transactionId);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Đã xóa giao dịch.')));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -39,7 +114,32 @@ class HomeScreen extends StatelessWidget {
           }
 
           if (transactionProvider.error != null) {
-            return Center(child: Text(transactionProvider.error!));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 56,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      transactionProvider.error!,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => context.read<TransactionProvider>().loadTransactions(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           return Column(
@@ -61,14 +161,12 @@ class HomeScreen extends StatelessWidget {
                           final transaction = transactionProvider.transactions[index];
                           return TransactionItem(
                             transaction: transaction,
-                            onEdit: () => Navigator.pushNamed(
+                            onEdit: () => _openTransactionForm(
                               context,
-                              AppRoutes.transactionForm,
                               arguments: transaction,
+                              successMessage: 'Sửa giao dịch thành công.',
                             ),
-                            onDelete: () => context
-                                .read<TransactionProvider>()
-                                .deleteTransaction(transaction.id),
+                            onDelete: () => _confirmDelete(context, transaction.id),
                           );
                         },
                       ),
@@ -78,7 +176,10 @@ class HomeScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, AppRoutes.transactionForm),
+        onPressed: () => _openTransactionForm(
+          context,
+          successMessage: 'Thêm giao dịch thành công.',
+        ),
         icon: const Icon(Icons.add),
         label: const Text('Thêm'),
       ),

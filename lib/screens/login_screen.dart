@@ -42,7 +42,13 @@ class LoginScreen extends StatelessWidget {
                                 Navigator.pushReplacementNamed(context, AppRoutes.home);
                               }
                             },
-                      icon: const Icon(Icons.login),
+                      icon: userProvider.isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.login),
                       label: Text(userProvider.isLoading ? 'Đang đăng nhập...' : 'Đăng nhập Google'),
                     ),
                     if (userProvider.error != null) ...[
@@ -51,6 +57,19 @@ class LoginScreen extends StatelessWidget {
                         userProvider.error!,
                         style: TextStyle(color: Theme.of(context).colorScheme.error),
                         textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: userProvider.isLoading
+                            ? null
+                            : () async {
+                                final success = await context.read<UserProvider>().signInWithGoogle();
+                                if (success && context.mounted) {
+                                  Navigator.pushReplacementNamed(context, AppRoutes.home);
+                                }
+                              },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
                       ),
                     ],
                   ],
