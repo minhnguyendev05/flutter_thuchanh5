@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:expense_tracker_app/models/transaction_model.dart';
 import 'package:expense_tracker_app/services/local_service.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +10,7 @@ class TransactionProvider extends ChangeNotifier {
   final LocalService _localService;
 
   final List<TransactionModel> _transactions = [];
+  String? _activeUserId;
   bool _isLoading = false;
   String? _error;
 
@@ -25,13 +28,39 @@ class TransactionProvider extends ChangeNotifier {
 
   double get balance => totalIncome - totalExpense;
 
+  void bindUser(String? userId) {
+    if (_activeUserId == userId) {
+      return;
+    }
+
+    _activeUserId = userId;
+    _error = null;
+
+    if (userId == null) {
+      _isLoading = false;
+      _transactions.clear();
+      notifyListeners();
+      return;
+    }
+
+    unawaited(loadTransactions());
+  }
+
   Future<void> loadTransactions() async {
+    if (_activeUserId == null) {
+      _transactions.clear();
+      _isLoading = false;
+      _error = null;
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final data = await _localService.getTransactions();
+      final data = await _localService.getTransactionsByUser(_activeUserId!);
       _transactions
         ..clear()
         ..addAll(data);
@@ -64,11 +93,20 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
+    if (_activeUserId == null) {
+      _error = 'Cannot save transactions: user not found';
+      notifyListeners();
+      return;
+    }
+
     _error = null;
     notifyListeners();
 
     try {
-      await _localService.saveTransactions(_transactions);
+      await _localService.saveTransactionsByUser(
+        userId: _activeUserId!,
+        transactions: _transactions,
+      );
     } catch (e) {
       _error = 'Cannot save transactions: $e';
     } finally {
