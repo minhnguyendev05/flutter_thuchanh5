@@ -5,12 +5,43 @@ import 'package:expense_tracker_app/utils/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class TransactionDetailScreen extends StatelessWidget {
+class TransactionDetailScreen extends StatefulWidget {
   const TransactionDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<TransactionDetailScreen> createState() => _TransactionDetailScreenState();
+}
+
+class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
+  String? _transactionId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_transactionId != null) {
+      return;
+    }
+
     final transaction = ModalRoute.of(context)!.settings.arguments as TransactionModel;
+    _transactionId = transaction.id;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final transaction = context.select<TransactionProvider, TransactionModel?>((provider) {
+      final id = _transactionId;
+      if (id == null) {
+        return null;
+      }
+      return provider.getById(id);
+    });
+
+    if (transaction == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chi tiết giao dịch')),
+        body: const Center(child: Text('Giao dịch không còn tồn tại.')),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -18,8 +49,8 @@ class TransactionDetailScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
-              Navigator.pushNamed(
+            onPressed: () async {
+              await Navigator.pushNamed(
                 context,
                 AppRoutes.transactionForm,
                 arguments: transaction,

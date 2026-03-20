@@ -1,4 +1,5 @@
 import 'package:expense_tracker_app/providers/transaction_provider.dart';
+import 'package:expense_tracker_app/providers/theme_provider.dart';
 import 'package:expense_tracker_app/providers/user_provider.dart';
 import 'package:expense_tracker_app/utils/app_routes.dart';
 import 'package:expense_tracker_app/utils/constants.dart';
@@ -14,13 +15,31 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) {
+      return;
+    }
+
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      context.read<TransactionProvider>().persistNow();
+    }
   }
 
   String _transactionSnapshot(TransactionProvider provider) {
@@ -306,6 +325,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+          IconButton(
+            onPressed: () => context.read<ThemeProvider>().toggleLightDark(),
+            icon: Icon(
+              Theme.of(context).brightness == Brightness.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            tooltip: 'Đổi giao diện sáng/tối',
+          ),
           IconButton(
             onPressed: () => Navigator.pushNamed(context, AppRoutes.statistics),
             icon: const Icon(Icons.pie_chart_outline),

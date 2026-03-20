@@ -1,4 +1,5 @@
 import 'package:expense_tracker_app/firebase_options.dart';
+import 'package:expense_tracker_app/providers/theme_provider.dart';
 import 'package:expense_tracker_app/providers/transaction_provider.dart';
 import 'package:expense_tracker_app/providers/user_provider.dart';
 import 'package:expense_tracker_app/screens/add_edit_transaction_screen.dart';
@@ -25,6 +26,9 @@ class ExpenseTrackerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<ThemeProvider>(
+          create: (_) => ThemeProvider()..initialize(),
+        ),
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()..initialize()),
         ChangeNotifierProxyProvider<UserProvider, TransactionProvider>(
           create: (_) => TransactionProvider(
@@ -41,29 +45,33 @@ class ExpenseTrackerApp extends StatelessWidget {
           },
         ),
       ],
-      child: MaterialApp(
-        title: 'Expense Tracker',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        ),
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.teal,
-            brightness: Brightness.dark,
-          ),
-        ),
-        themeMode: ThemeMode.system,
-        initialRoute: AppRoutes.root,
-        routes: {
-          AppRoutes.root: (_) => const RootRouter(),
-          AppRoutes.login: (_) => const LoginScreen(),
-          AppRoutes.home: (_) => const HomeScreen(),
-          AppRoutes.transactionForm: (_) => const AddEditTransactionScreen(),
-          AppRoutes.transactionDetail: (_) => const TransactionDetailScreen(),
-          AppRoutes.statistics: (_) => const StatisticsScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'Expense Tracker',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+            ),
+            darkTheme: ThemeData(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.teal,
+                brightness: Brightness.dark,
+              ),
+            ),
+            themeMode: themeProvider.themeMode,
+            initialRoute: AppRoutes.root,
+            routes: {
+              AppRoutes.root: (_) => const RootRouter(),
+              AppRoutes.login: (_) => const LoginScreen(),
+              AppRoutes.home: (_) => const HomeScreen(),
+              AppRoutes.transactionForm: (_) => const AddEditTransactionScreen(),
+              AppRoutes.transactionDetail: (_) => const TransactionDetailScreen(),
+              AppRoutes.statistics: (_) => const StatisticsScreen(),
+            },
+          );
         },
       ),
     );
