@@ -72,6 +72,14 @@ class TransactionProvider extends ChangeNotifier {
   double get balance => totalIncome - totalExpense;
   double get filteredBalance => filteredIncome - filteredExpense;
 
+  TransactionModel? getById(String id) {
+    final index = _transactions.indexWhere((tx) => tx.id == id);
+    if (index == -1) {
+      return null;
+    }
+    return _transactions[index];
+  }
+
   void bindUser(String? userId) {
     if (_activeUserId == userId) {
       return;
@@ -204,6 +212,10 @@ class TransactionProvider extends ChangeNotifier {
       _error = 'Cannot save transactions: $e';
       notifyListeners();
     }
+  }
+
+  Future<void> persistNow() async {
+    await _persist();
   }
 
   void onSearchQueryChanged(String query) {

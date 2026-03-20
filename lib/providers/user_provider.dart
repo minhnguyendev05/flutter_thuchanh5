@@ -1,6 +1,7 @@
 import 'package:expense_tracker_app/models/user_model.dart';
 import 'package:expense_tracker_app/services/auth_service.dart';
 import 'package:expense_tracker_app/services/local_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class UserProvider extends ChangeNotifier {
@@ -14,6 +15,34 @@ class UserProvider extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _error;
+
+  String _friendlyAuthError(Object error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-email':
+          return 'Email không đúng định dạng.';
+        case 'user-not-found':
+          return 'Không tìm thấy tài khoản với email này.';
+        case 'wrong-password':
+        case 'invalid-credential':
+          return 'Email hoặc mật khẩu không đúng.';
+        case 'email-already-in-use':
+          return 'Email này đã được đăng ký.';
+        case 'weak-password':
+          return 'Mật khẩu quá yếu, vui lòng dùng tối thiểu 6 ký tự.';
+        case 'too-many-requests':
+          return 'Bạn thao tác quá nhiều lần. Vui lòng thử lại sau.';
+        case 'network-request-failed':
+          return 'Không có kết nối mạng. Vui lòng kiểm tra Internet.';
+        case 'popup-closed-by-user':
+          return 'Bạn đã đóng cửa sổ đăng nhập.';
+        default:
+          return 'Xác thực thất bại. Vui lòng thử lại.';
+      }
+    }
+
+    return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+  }
 
   UserModel? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
@@ -66,7 +95,7 @@ class UserProvider extends ChangeNotifier {
       await _localService.saveUser(user);
       return true;
     } catch (e) {
-      _error = 'Google Sign-In thất bại: $e';
+      _error = _friendlyAuthError(e);
       return false;
     } finally {
       _isLoading = false;
@@ -96,7 +125,7 @@ class UserProvider extends ChangeNotifier {
       await _localService.saveUser(user);
       return true;
     } catch (e) {
-      _error = 'Đăng nhập Email thất bại: $e';
+      _error = _friendlyAuthError(e);
       return false;
     } finally {
       _isLoading = false;
@@ -128,7 +157,7 @@ class UserProvider extends ChangeNotifier {
       await _localService.saveUser(user);
       return true;
     } catch (e) {
-      _error = 'Đăng ký Email thất bại: $e';
+      _error = _friendlyAuthError(e);
       return false;
     } finally {
       _isLoading = false;
