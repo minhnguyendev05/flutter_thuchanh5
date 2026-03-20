@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  static const String appTitle = 'Expense Tracker - Nhom 8';
+  static const String appTitle = 'Expense Tracker - Nhóm 8';
 
   static const List<String> categories = <String>[
     'Ăn uống',
