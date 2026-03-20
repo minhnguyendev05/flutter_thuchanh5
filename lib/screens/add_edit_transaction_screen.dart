@@ -107,8 +107,10 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen>
       final provider = context.read<TransactionProvider>();
       if (_editingTransaction == null) {
         await provider.addTransaction(model);
+        _editingTransaction = model;
       } else {
         await provider.updateTransaction(model);
+        _editingTransaction = model;
       }
 
       _didAutoSave = true;
@@ -145,13 +147,8 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen>
       );
 
       final provider = context.read<TransactionProvider>();
-      if (_editingTransaction == null) {
-        await provider.addTransaction(model);
-        _editingTransaction = model;
-      } else {
-        await provider.updateTransaction(model);
-        _editingTransaction = model;
-      }
+      await provider.addOrUpdateTransaction(model, syncRemote: false);
+      _editingTransaction = model;
 
       _didAutoSave = true;
     } finally {
