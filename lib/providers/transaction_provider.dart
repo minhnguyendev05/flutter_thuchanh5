@@ -179,6 +179,23 @@ class TransactionProvider extends ChangeNotifier {
     await _persist();
   }
 
+  Future<void> addOrUpdateTransaction(
+    TransactionModel transaction, {
+    bool syncRemote = true,
+  }) async {
+    _error = null;
+    final index = _transactions.indexWhere((tx) => tx.id == transaction.id);
+    if (index == -1) {
+      _transactions.add(transaction);
+    } else {
+      _transactions[index] = transaction;
+    }
+
+    _sortByNewest(_transactions);
+    _applyFilterAndSearch();
+    await _persist(syncRemote: syncRemote);
+  }
+
   Future<void> deleteTransaction(String id) async {
     _error = null;
     final before = _transactions.length;
@@ -191,7 +208,7 @@ class TransactionProvider extends ChangeNotifier {
     await _persist();
   }
 
-  Future<void> _persist() async {
+  Future<void> _persist({bool syncRemote = true}) async {
     try {
       if (_activeUserId == null) {
         await _localService.saveTransactions(_transactions);
@@ -201,10 +218,11 @@ class TransactionProvider extends ChangeNotifier {
           userId: userId,
           transactions: _transactions,
         );
-        if (_firebaseTransactionService != null) {
-          await _firebaseTransactionService!.saveTransactionsByUser(
-            userId: userId,
-            transactions: _transactions,
+        if (syncRemote && _firebaseTransactionService != null) {
+          unawaited(
+            _firebaseTransactionService!
+                .saveTransactionsByUser(userId: userId, transactions: _transactions)
+                .catchError((_) {}),
           );
         }
       }
@@ -214,8 +232,8 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> persistNow() async {
-    await _persist();
+  Future<void> persistNow({bool syncRemote = false}) async {
+    await _persist(syncRemote: syncRemote);
   }
 
   void onSearchQueryChanged(String query) {

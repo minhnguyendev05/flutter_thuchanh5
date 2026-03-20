@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      context.read<TransactionProvider>().persistNow();
+      context.read<TransactionProvider>().persistNow(syncRemote: false);
     }
   }
 
